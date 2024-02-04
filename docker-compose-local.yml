@@ -1,0 +1,59 @@
+version: '3.8'
+services:
+  # Nginx Service as a reverse proxy
+  nginx:
+    build:
+      context: .
+      dockerfile: ./docker/nginx/Dockerfile
+    ports:
+      - 80:80
+      - "443:443"
+    volumes:
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./frontend-next:/usr/share/nginx/html/next
+      - ./backend-laravel/public:/usr/share/nginx/html/laravel
+    depends_on:
+      - user-front
+      - backend-laravel
+    networks:
+      - omoide_networks
+
+  # Next.js Service
+  user-front:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend-next:/app
+      - front_node_modules:/app/node_modules
+    command: npm run dev
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend-laravel:9000
+    ports:
+      - "3000:3000"
+    networks:
+      - omoide_networks
+
+  # Laravel Service
+  backend-laravel:
+    build:
+      context: .
+      dockerfile: ./docker/php/Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    volumes:
+      - ./backend-laravel:/app
+      - composer_files:/app/vendor
+    working_dir: /app
+    command: php artisan serve --host=0.0.0.0 --port=9000
+    ports:
+    - "9000:9000"
+    networks:
+      - omoide_networks
+
+networks:
+  omoide_networks:
+
+volumes:
+  front_node_modules:
+  composer_files:
